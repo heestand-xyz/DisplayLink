@@ -5,79 +5,96 @@ import QuartzCore
 
 // Inspired by Imagine Engine
 
-internal protocol DisplayLinkProtocol: ObservableObject {
+public protocol DisplayLinkProtocol: ObservableObject {
     
     var maxFps: Double { get }
     var fps: Double { get }
     
-    var frameLoop: () -> () { get set }
-    
     init()
     
+    func listen(frameLoop: @escaping () -> ())
     func start()
     func stop()
 }
 
 #if !os(macOS)
-internal final class DisplayLink: DisplayLinkProtocol {
+public final class DisplayLink: DisplayLinkProtocol {
     
-    var maxFps: Double {
+    public var maxFps: Double {
         Double(link.preferredFramesPerSecond)
     }
     
-    @Published var fps: Double = 1.0
+    @Published public var fps: Double = 1.0
     
-    var frameLoop: () -> () = {}
-    
+    private var frameLoops: [() -> ()] = []
+
     private lazy var link = CADisplayLink(target: self, selector: #selector(loop))
     
     private var lastFrameDate: Date?
+    
+    public init() {
+        start()
+    }
     
     deinit {
         stop()
     }
 
-    func start() {
+    public func start() {
         link.add(to: .main, forMode: .common)
     }
     
-    func stop()  {
+    public func stop()  {
         link.remove(from: .main, forMode: .common)
+    }
+    
+    public func listen(frameLoop: @escaping () -> ()) {
+        frameLoops.append(frameLoop)
     }
 
     @objc private func loop() {
-        frameLoop()
+        
         if let date: Date = lastFrameDate {
             let time: Double = -date.timeIntervalSinceNow
             fps = 1.0 / time
         }
         lastFrameDate = Date()
+        
+        DispatchQueue.main.async {
+            self.frameLoops.forEach { frameLoop in
+                frameLoop()
+            }
+        }
     }
 }
 #endif
 
 #if os(macOS)
-internal final class DisplayLink: DisplayLinkProtocol {
+public final class DisplayLink: DisplayLinkProtocol {
     
-    var maxFps: Double {
+    public var maxFps: Double {
         let id = CGMainDisplayID()
         guard let mode = CGDisplayCopyDisplayMode(id) else { return 1.0 }
         return mode.refreshRate
     }
     
-    @Published var fps: Double = 1.0
+    @Published public var fps: Double = 1.0
     
-    var frameLoop: () -> () = {}
+    private var frameLoops: [() -> ()] = []
     
     private var link: CVDisplayLink?
 
     private var lastFrameDate: Date?
-
+    
+    public init() {
+        start()
+    }
+    
     deinit {
         stop()
     }
 
-    func start() {
+    public func start() {
         CVDisplayLinkCreateWithActiveCGDisplays(&link)
 
         guard let link = link else {
@@ -90,18 +107,28 @@ internal final class DisplayLink: DisplayLinkProtocol {
         CVDisplayLinkStart(link)
     }
     
-    func stop() {
+    public func stop() {
         guard let link = link else { return }
         CVDisplayLinkStop(link)
     }
+    
+    public func listen(frameLoop: @escaping () -> ()) {
+        frameLoops.append(frameLoop)
+    }
 
     @objc func loop() {
-        DispatchQueue.main.async(execute: frameLoop)
+        
         if let date: Date = lastFrameDate {
             let time: Double = -date.timeIntervalSinceNow
             fps = 1.0 / time
         }
         lastFrameDate = Date()
+
+        DispatchQueue.main.async {
+            self.frameLoops.forEach { frameLoop in
+                frameLoop()
+            }
+        }
     }
 }
 
