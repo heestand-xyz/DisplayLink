@@ -2,6 +2,9 @@
 import Foundation
 import CoreVideo
 import QuartzCore
+#if !os(macOS)
+import UIKit
+#endif
 
 // Inspired by Imagine Engine
 
@@ -21,7 +24,7 @@ public protocol DisplayLinkProtocol: ObservableObject {
 public final class DisplayLink: DisplayLinkProtocol {
     
     public var maxFps: Double {
-        Double(link.preferredFramesPerSecond)
+        Double(UIScreen.main.maximumFramesPerSecond)
     }
     
     @Published public var fps: Double = 1.0
