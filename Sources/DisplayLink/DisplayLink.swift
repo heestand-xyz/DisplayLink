@@ -13,7 +13,7 @@ public protocol DisplayLinkProtocol: ObservableObject {
     var maxFps: Double { get }
     var fps: Double { get }
     
-    init()
+    init(preferredFps: Float?)
     
     func listen(frameLoop: @escaping () -> ())
     func start()
@@ -35,7 +35,12 @@ public final class DisplayLink: DisplayLinkProtocol {
     
     private var lastFrameDate: Date?
     
-    public init() {
+    public init(preferredFps: Float? = 120) {
+        if #available(iOS 15.0, *) {
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 10,
+                                                            maximum: 120,
+                                                            preferred: preferredFps)
+        }
         start()
     }
     
@@ -89,7 +94,7 @@ public final class DisplayLink: DisplayLinkProtocol {
 
     private var lastFrameDate: Date?
     
-    public init() {
+    public init(preferredFps: Float? = 60) {
         start()
     }
     
