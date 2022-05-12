@@ -1,3 +1,3 @@
 # DisplayLink
 
-A description of this package.
+A multi platform DisplayLink
