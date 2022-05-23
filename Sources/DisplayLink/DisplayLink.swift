@@ -94,7 +94,7 @@ public final class DisplayLink: DisplayLinkProtocol {
 
     private var lastFrameDate: Date?
     
-    public init(preferredFps: Float? = 60) {
+    public init(preferredFps: Float? = 120) {
         start()
     }
     
