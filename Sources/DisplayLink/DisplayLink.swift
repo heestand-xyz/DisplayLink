@@ -82,7 +82,7 @@ public final class DisplayLink: DisplayLinkProtocol {
     
     public var maxFps: Double {
         let id = CGMainDisplayID()
-        guard let mode = CGDisplayCopyDisplayMode(id) else { return 1.0 }
+        guard let mode = CGDisplayCopyDisplayMode(id) else { return 60 }
         return mode.refreshRate
     }
     
