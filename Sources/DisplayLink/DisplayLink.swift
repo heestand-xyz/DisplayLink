@@ -24,7 +24,11 @@ public protocol DisplayLinkProtocol: ObservableObject {
 public final class DisplayLink: DisplayLinkProtocol {
     
     public var maxFps: Double {
+        #if os(xrOS)
+        90
+        #else
         Double(UIScreen.main.maximumFramesPerSecond)
+        #endif
     }
     
     @Published public var fps: Double = 1.0
