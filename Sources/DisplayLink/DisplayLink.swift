@@ -72,10 +72,8 @@ public final class DisplayLink: DisplayLinkProtocol {
         }
         lastFrameDate = Date()
         
-        DispatchQueue.main.async { [weak self] in
-            self?.frameLoops.forEach { frameLoop in
-                frameLoop()
-            }
+        frameLoops.forEach { frameLoop in
+            frameLoop()
         }
     }
 }
@@ -136,10 +134,8 @@ public final class DisplayLink: DisplayLinkProtocol {
         }
         lastFrameDate = Date()
 
-        DispatchQueue.main.async { [weak self] in
-            self?.frameLoops.forEach { frameLoop in
-                frameLoop()
-            }
+        frameLoops.forEach { frameLoop in
+            frameLoop()
         }
     }
 }
