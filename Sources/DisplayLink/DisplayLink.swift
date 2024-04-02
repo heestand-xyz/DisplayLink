@@ -8,23 +8,43 @@ import UIKit
 
 // Inspired by Imagine Engine
 
+public typealias FrameLoop = (id: UUID, action: () -> ())
+
 public protocol DisplayLinkProtocol: ObservableObject {
     
     var maxFps: Double { get }
     var fps: Double { get }
     
+    var frameLoops: [FrameLoop] { get set }
+    
     init(preferredFps: Float?)
     
-    func listen(frameLoop: @escaping () -> ())
+    @discardableResult
+    func listen(frameLoop: @escaping () -> ()) -> UUID
+    func unlisten(id: UUID)
     func start()
     func stop()
+}
+
+extension DisplayLinkProtocol {
+    
+    @discardableResult
+    public func listen(frameLoop: @escaping () -> ()) -> UUID {
+        let id = UUID()
+        frameLoops.append((id: id, action: frameLoop))
+        return id
+    }
+    
+    public func unlisten(id: UUID) {
+        frameLoops.removeAll(where: { $0.id == id })
+    }
 }
 
 #if !os(macOS)
 public final class DisplayLink: DisplayLinkProtocol {
     
     public var maxFps: Double {
-        #if os(xrOS)
+        #if os(visionOS)
         90
         #else
         Double(UIScreen.main.maximumFramesPerSecond)
@@ -33,7 +53,7 @@ public final class DisplayLink: DisplayLinkProtocol {
     
     @Published public var fps: Double = 1.0
     
-    private var frameLoops: [() -> ()] = []
+    public var frameLoops: [FrameLoop] = []
 
     private lazy var link = CADisplayLink(target: self, selector: #selector(loop))
     
@@ -59,10 +79,6 @@ public final class DisplayLink: DisplayLinkProtocol {
     public func stop()  {
         link.remove(from: .main, forMode: .common)
     }
-    
-    public func listen(frameLoop: @escaping () -> ()) {
-        frameLoops.append(frameLoop)
-    }
 
     @objc private func loop() {
         
@@ -72,8 +88,8 @@ public final class DisplayLink: DisplayLinkProtocol {
         }
         lastFrameDate = Date()
         
-        frameLoops.forEach { frameLoop in
-            frameLoop()
+        frameLoops.forEach { _, action in
+            action()
         }
     }
 }
@@ -90,7 +106,7 @@ public final class DisplayLink: DisplayLinkProtocol {
     
     @Published public var fps: Double = 1.0
     
-    private var frameLoops: [() -> ()] = []
+    public var frameLoops: [FrameLoop] = []
     
     private var link: CVDisplayLink?
 
@@ -121,10 +137,6 @@ public final class DisplayLink: DisplayLinkProtocol {
         guard let link = link else { return }
         CVDisplayLinkStop(link)
     }
-    
-    public func listen(frameLoop: @escaping () -> ()) {
-        frameLoops.append(frameLoop)
-    }
 
     @objc func loop() {
         
@@ -134,8 +146,8 @@ public final class DisplayLink: DisplayLinkProtocol {
         }
         lastFrameDate = Date()
 
-        frameLoops.forEach { frameLoop in
-            frameLoop()
+        frameLoops.forEach { _, action in
+            action()
         }
     }
 }
