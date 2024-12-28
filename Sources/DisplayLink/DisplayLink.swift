@@ -8,19 +8,26 @@ import UIKit
 
 // Inspired by Imagine Engine
 
+@globalActor public actor DisplayLinkActor {
+    public static let shared = DisplayLinkActor()
+}
+
 public typealias FrameLoop = (id: UUID, action: () -> ())
 
-public protocol DisplayLinkProtocol: ObservableObject {
+public protocol DisplayLinkProtocol: AnyObject, Sendable {
     
+    @MainActor
     var maxFps: Double { get }
+    @DisplayLinkActor
     var fps: Double { get }
     
+    @DisplayLinkActor
     var frameLoops: [FrameLoop] { get set }
     
     init(preferredFps: Float?)
     
     @discardableResult
-    func listen(frameLoop: @escaping () -> ()) -> UUID
+    func listen(frameLoop: sending @escaping () -> ()) -> UUID
     func unlisten(id: UUID)
     func start()
     func stop()
@@ -29,20 +36,25 @@ public protocol DisplayLinkProtocol: ObservableObject {
 extension DisplayLinkProtocol {
     
     @discardableResult
-    public func listen(frameLoop: @escaping () -> ()) -> UUID {
+    public func listen(frameLoop: sending @escaping () -> ()) -> UUID {
         let id = UUID()
-        frameLoops.append((id: id, action: frameLoop))
+        Task { @DisplayLinkActor in
+            frameLoops.append((id: id, action: frameLoop))
+        }
         return id
     }
     
     public func unlisten(id: UUID) {
-        frameLoops.removeAll(where: { $0.id == id })
+        Task { @DisplayLinkActor in
+            frameLoops.removeAll(where: { $0.id == id })
+        }
     }
 }
 
 #if !os(macOS)
 public final class DisplayLink: DisplayLinkProtocol {
     
+    @MainActor
     public var maxFps: Double {
         #if os(visionOS)
         90
@@ -51,21 +63,27 @@ public final class DisplayLink: DisplayLinkProtocol {
         #endif
     }
     
-    @Published public var fps: Double = 1.0
-    
+    @DisplayLinkActor
+    public var fps: Double = 1.0
+
+    @DisplayLinkActor
     public var frameLoops: [FrameLoop] = []
 
-    private lazy var link = CADisplayLink(target: self, selector: #selector(loop))
+    @DisplayLinkActor
+    private var link: CADisplayLink?
     
+    @DisplayLinkActor
     private var lastFrameDate: Date?
     
     public init(preferredFps: Float? = 120) {
-        if #available(iOS 15.0, *) {
-            link.preferredFrameRateRange = CAFrameRateRange(minimum: 10,
-                                                            maximum: 120,
-                                                            preferred: preferredFps)
+        Task { @DisplayLinkActor in
+            link?.preferredFrameRateRange = CAFrameRateRange(
+                minimum: 10,
+                maximum: 120,
+                preferred: preferredFps
+            )
+            start()
         }
-        start()
     }
     
     deinit {
@@ -73,23 +91,31 @@ public final class DisplayLink: DisplayLinkProtocol {
     }
 
     public func start() {
-        link.add(to: .main, forMode: .common)
+        Task { @DisplayLinkActor in
+            if link == nil {
+                link = CADisplayLink(target: self, selector: #selector(loop))
+            }
+            link?.add(to: .main, forMode: .common)
+        }
     }
     
     public func stop()  {
-        link.remove(from: .main, forMode: .common)
+        Task { @DisplayLinkActor in
+            link?.remove(from: .main, forMode: .common)
+        }
     }
 
     @objc private func loop() {
+        Task { @DisplayLinkActor in
+            if let date: Date = lastFrameDate {
+                let time: Double = -date.timeIntervalSinceNow
+                fps = 1.0 / time
+            }
+            lastFrameDate = Date()
         
-        if let date: Date = lastFrameDate {
-            let time: Double = -date.timeIntervalSinceNow
-            fps = 1.0 / time
-        }
-        lastFrameDate = Date()
-        
-        frameLoops.forEach { _, action in
-            action()
+            frameLoops.forEach { _, action in
+                action()
+            }
         }
     }
 }
@@ -98,18 +124,36 @@ public final class DisplayLink: DisplayLinkProtocol {
 #if os(macOS)
 public final class DisplayLink: DisplayLinkProtocol {
     
+    @MainActor
     public var maxFps: Double {
         let id = CGMainDisplayID()
         guard let mode = CGDisplayCopyDisplayMode(id) else { return 60 }
         return mode.refreshRate
     }
     
-    @Published public var fps: Double = 1.0
+    @DisplayLinkActor
+    public var fps: Double = 1.0 {
+        didSet {
+            fpsContinuation?.yield(fps)
+        }
+    }
+    @DisplayLinkActor
+    private var fpsContinuation: AsyncStream<Double>.Continuation?
+    public var fpsStream: AsyncStream<Double> {
+        AsyncStream { continuation in
+            Task { @DisplayLinkActor in
+                fpsContinuation = continuation
+            }
+        }
+    }
     
+    @DisplayLinkActor
     public var frameLoops: [FrameLoop] = []
     
+    @DisplayLinkActor
     private var link: CVDisplayLink?
 
+    @DisplayLinkActor
     private var lastFrameDate: Date?
     
     public init(preferredFps: Float? = 120) {
@@ -117,47 +161,55 @@ public final class DisplayLink: DisplayLinkProtocol {
     }
     
     deinit {
-        stop()
-    }
-
-    public func start() {
-        CVDisplayLinkCreateWithActiveCGDisplays(&link)
-
-        guard let link = link else {
-            return
-        }
-
-        let opaquePointerToSelf = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-        CVDisplayLinkSetOutputCallback(link, _displayLinkCallback, opaquePointerToSelf)
-
-        CVDisplayLinkStart(link)
-    }
-    
-    public func stop() {
         guard let link = link else { return }
         CVDisplayLinkStop(link)
     }
 
-    @objc func loop() {
-        
-        if let date: Date = lastFrameDate {
-            let time: Double = -date.timeIntervalSinceNow
-            fps = 1.0 / time
+    public func start() {
+        Task { @DisplayLinkActor in
+            CVDisplayLinkCreateWithActiveCGDisplays(&link)
+            
+            guard let link = link else {
+                return
+            }
+            
+            let opaquePointerToSelf = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+            CVDisplayLinkSetOutputCallback(link, _displayLinkCallback, opaquePointerToSelf)
+            
+            CVDisplayLinkStart(link)
         }
-        lastFrameDate = Date()
+    }
+    
+    public func stop() {
+        Task { @DisplayLinkActor in
+            guard let link = link else { return }
+            CVDisplayLinkStop(link)
+        }
+    }
 
-        frameLoops.forEach { _, action in
-            action()
+    @objc func loop() {
+        Task { @DisplayLinkActor in
+            if let date: Date = lastFrameDate {
+                let time: Double = -date.timeIntervalSinceNow
+                fps = 1.0 / time
+            }
+            lastFrameDate = Date()
+            
+            frameLoops.forEach { _, action in
+                action()
+            }
         }
     }
 }
 
-private func _displayLinkCallback(displayLink: CVDisplayLink,
-                                  _ now: UnsafePointer<CVTimeStamp>,
-                                  _ outputTime: UnsafePointer<CVTimeStamp>,
-                                  _ flagsIn: CVOptionFlags,
-                                  _ flagsOut: UnsafeMutablePointer<CVOptionFlags>,
-                                  _ displayLinkContext: UnsafeMutableRawPointer?) -> CVReturn {
+private func _displayLinkCallback(
+    displayLink: CVDisplayLink,
+    _ now: UnsafePointer<CVTimeStamp>,
+    _ outputTime: UnsafePointer<CVTimeStamp>,
+    _ flagsIn: CVOptionFlags,
+    _ flagsOut: UnsafeMutablePointer<CVOptionFlags>,
+    _ displayLinkContext: UnsafeMutableRawPointer?
+) -> CVReturn {
     unsafeBitCast(displayLinkContext, to: DisplayLink.self).loop()
     return kCVReturnSuccess
 }
