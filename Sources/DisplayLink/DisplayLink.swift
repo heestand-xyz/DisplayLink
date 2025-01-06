@@ -27,7 +27,7 @@ public protocol DisplayLinkProtocol: AnyObject, Sendable {
     init(preferredFps: Float?)
     
     @discardableResult
-    func listen(frameLoop: sending @escaping () -> ()) -> UUID
+    func listen(frameLoop: sending @escaping @DisplayLinkActor () -> ()) -> UUID
     func unlisten(id: UUID)
     func start()
     func stop()
@@ -36,7 +36,7 @@ public protocol DisplayLinkProtocol: AnyObject, Sendable {
 extension DisplayLinkProtocol {
     
     @discardableResult
-    public func listen(frameLoop: sending @escaping () -> ()) -> UUID {
+    public func listen(frameLoop: sending @escaping @DisplayLinkActor () -> ()) -> UUID {
         let id = UUID()
         Task { @DisplayLinkActor in
             frameLoops.append((id: id, action: frameLoop))
