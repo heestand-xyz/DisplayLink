@@ -24,15 +24,6 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
         public let time: TimeInterval
         public let index: Int
         public let fraction: CGFloat
-        public var easeInOutFraction: CGFloat {
-            cos(fraction * .pi - .pi) / 2.0 + 0.5
-        }
-        public var easeInFraction: CGFloat {
-            cos(fraction * .pi / 2 - .pi) + 1.0
-        }
-        public var easeOutFraction: CGFloat {
-            cos(fraction * .pi / 2 - .pi / 2)
-        }
         @MainActor static let zero = Progress(time: 0.0, index: 0, fraction: 0.0)
     }
     public private(set) var progress: Progress = .zero
@@ -49,7 +40,7 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
     public private(set) var state: State
     
     public init(
-        for duration: TimeInterval
+        duration: TimeInterval
     ) {
         id = UUID()
         self.duration = duration
@@ -110,5 +101,47 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
     
     nonisolated public static func == (lhs: DisplayLinkAnimator, rhs: DisplayLinkAnimator) -> Bool {
         lhs.id == rhs.id
+    }
+}
+
+extension DisplayLinkAnimator.Progress {
+    
+    public func fractionWithEaseInOut(iterations: Int = 1) -> CGFloat {
+        guard iterations > 0 else { return fraction }
+        var fraction: CGFloat = fraction
+        for _ in 0..<iterations {
+            fraction = Self.easeInOut(fraction)
+        }
+        return fraction
+    }
+    
+    public func fractionWithEaseIn(iterations: Int = 1) -> CGFloat {
+        guard iterations > 0 else { return fraction }
+        var fraction: CGFloat = fraction
+        for _ in 0..<iterations {
+            fraction = Self.easeIn(fraction)
+        }
+        return fraction
+    }
+    
+    public func fractionWithEaseOut(iterations: Int = 1) -> CGFloat {
+        guard iterations > 0 else { return fraction }
+        var fraction: CGFloat = fraction
+        for _ in 0..<iterations {
+            fraction = Self.easeOut(fraction)
+        }
+        return fraction
+    }
+    
+    private static func easeInOut(_ fraction: CGFloat) -> CGFloat {
+        cos(fraction * .pi - .pi) / 2.0 + 0.5
+    }
+    
+    private static func easeIn(_ fraction: CGFloat) -> CGFloat {
+        cos(fraction * .pi / 2 - .pi) + 1.0
+    }
+    
+    private static func easeOut(_ fraction: CGFloat) -> CGFloat {
+        cos(fraction * .pi / 2 - .pi / 2)
     }
 }
