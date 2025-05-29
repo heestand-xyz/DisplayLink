@@ -87,7 +87,7 @@ public final class DisplayLink: DisplayLinkProtocol {
     }
     
     deinit {
-        stop()
+        link = nil
     }
 
     public func start() {
@@ -102,6 +102,7 @@ public final class DisplayLink: DisplayLinkProtocol {
     public func stop()  {
         Task { @DisplayLinkActor in
             link?.remove(from: .main, forMode: .common)
+            link = nil
         }
     }
 
