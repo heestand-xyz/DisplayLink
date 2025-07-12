@@ -29,7 +29,7 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
     public private(set) var progress: Progress = .zero
     
     private var loop: ((Progress) -> Void)?
-    private var completion: (() -> Void)?
+    private var completion: ((Bool) -> Void)?
     
     public enum State {
         case ready
@@ -50,7 +50,7 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
     
     public func run(
         loop: ((Progress) -> Void)? = nil,
-        completion: (() -> Void)? = nil
+        completion: ((_ finished: Bool) -> Void)? = nil
     ) {
         guard state == .ready else { return }
         self.loop = loop
@@ -73,9 +73,9 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
                 fraction: 1.0
             )
             loop?(progress)
-            completion?()
-            stop()
             state = .done
+            completion?(true)
+            stop()
         } else {
             progress = Progress(
                 time: time,
@@ -88,8 +88,12 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
     }
     
     public func cancel() {
+        let oldState = state
         state = .cancelled
-        stop()
+        if oldState == .running {
+            completion?(false)
+            stop()
+        }
     }
     
     private func stop() {
