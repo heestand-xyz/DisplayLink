@@ -20,15 +20,9 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
     private let duration: TimeInterval
     private var index: Int = 0
     
-    public struct Progress {
-        public let time: TimeInterval
-        public let index: Int
-        public let fraction: CGFloat
-        @MainActor static let zero = Progress(time: 0.0, index: 0, fraction: 0.0)
-    }
-    public private(set) var progress: Progress = .zero
+    public private(set) var progress: DisplayLinkAnimationProgress = .zero
     
-    private var loop: ((Progress) -> Void)?
+    private var loop: ((DisplayLinkAnimationProgress) -> Void)?
     private var completion: ((Bool) -> Void)?
     
     public enum State {
@@ -49,7 +43,7 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
     }
     
     public func run(
-        loop: ((Progress) -> Void)? = nil,
+        loop: ((DisplayLinkAnimationProgress) -> Void)? = nil,
         completion: ((_ finished: Bool) -> Void)? = nil
     ) {
         guard state == .ready else { return }
@@ -67,7 +61,7 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
         guard state == .running else { return }
         let time: TimeInterval = startDate.distance(to: .now)
         if time >= duration {
-            progress = Progress(
+            progress = DisplayLinkAnimationProgress(
                 time: duration,
                 index: index,
                 fraction: 1.0
@@ -77,7 +71,7 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
             completion?(true)
             stop()
         } else {
-            progress = Progress(
+            progress = DisplayLinkAnimationProgress(
                 time: time,
                 index: index,
                 fraction: time / duration
@@ -105,47 +99,5 @@ public final class DisplayLinkAnimator: Sendable, Equatable {
     
     nonisolated public static func == (lhs: DisplayLinkAnimator, rhs: DisplayLinkAnimator) -> Bool {
         lhs.id == rhs.id
-    }
-}
-
-extension DisplayLinkAnimator.Progress {
-    
-    public func fractionWithEaseInOut(iterations: Int = 1) -> CGFloat {
-        guard iterations > 0 else { return fraction }
-        var fraction: CGFloat = fraction
-        for _ in 0..<iterations {
-            fraction = Self.easeInOut(fraction)
-        }
-        return fraction
-    }
-    
-    public func fractionWithEaseIn(iterations: Int = 1) -> CGFloat {
-        guard iterations > 0 else { return fraction }
-        var fraction: CGFloat = fraction
-        for _ in 0..<iterations {
-            fraction = Self.easeIn(fraction)
-        }
-        return fraction
-    }
-    
-    public func fractionWithEaseOut(iterations: Int = 1) -> CGFloat {
-        guard iterations > 0 else { return fraction }
-        var fraction: CGFloat = fraction
-        for _ in 0..<iterations {
-            fraction = Self.easeOut(fraction)
-        }
-        return fraction
-    }
-    
-    private static func easeInOut(_ fraction: CGFloat) -> CGFloat {
-        cos(fraction * .pi - .pi) / 2.0 + 0.5
-    }
-    
-    private static func easeIn(_ fraction: CGFloat) -> CGFloat {
-        cos(fraction * .pi / 2 - .pi) + 1.0
-    }
-    
-    private static func easeOut(_ fraction: CGFloat) -> CGFloat {
-        cos(fraction * .pi / 2 - .pi / 2)
     }
 }
