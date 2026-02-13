@@ -46,6 +46,16 @@ public final class AsyncDisplayLinkAnimator: Sendable, Equatable {
     }
     
     public func run(
+        loop: @escaping (DisplayLinkAnimationProgress) async -> Void
+    ) async -> Bool {
+        await withCheckedContinuation { continuation in
+            run(loop: loop) { finished in
+                continuation.resume(returning: finished)
+            }
+        }
+    }
+    
+    public func run(
         loop: ((DisplayLinkAnimationProgress) async -> Void)? = nil,
         completion: ((_ finished: Bool) async -> Void)? = nil
     ) {
