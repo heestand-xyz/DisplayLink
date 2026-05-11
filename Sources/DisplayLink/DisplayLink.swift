@@ -107,7 +107,7 @@ public final class DisplayLink: DisplayLinkProtocol {
     }
 
     @objc private func loop() {
-        Task { @DisplayLinkActor in
+        Task(name: "Display Link: Loop", priority: .high) { @DisplayLinkActor in
             if let date: Date = lastFrameDate {
                 let time: Double = -date.timeIntervalSinceNow
                 fps = 1.0 / time
@@ -189,7 +189,7 @@ public final class DisplayLink: DisplayLinkProtocol {
     }
 
     @objc func loop() {
-        Task { @DisplayLinkActor in
+        Task(name: "Display Link: Loop", priority: .high) { @DisplayLinkActor in
             if let date: Date = lastFrameDate {
                 let time: Double = -date.timeIntervalSinceNow
                 fps = 1.0 / time
