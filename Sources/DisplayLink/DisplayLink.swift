@@ -74,16 +74,12 @@ public final class DisplayLink: DisplayLinkProtocol {
     
     @DisplayLinkActor
     private var lastFrameDate: Date?
+
+    private let preferredFps: Float?
     
     public init(preferredFps: Float? = 120) {
-        Task { @DisplayLinkActor in
-            link?.preferredFrameRateRange = CAFrameRateRange(
-                minimum: 10,
-                maximum: 120,
-                preferred: preferredFps
-            )
-            start()
-        }
+        self.preferredFps = preferredFps
+        start()
     }
     
     deinit {
@@ -91,9 +87,15 @@ public final class DisplayLink: DisplayLinkProtocol {
     }
 
     public func start() {
-        Task { @DisplayLinkActor in
+        Task(name: "DisplayLink: Start") { @DisplayLinkActor in
             if link == nil {
-                link = CADisplayLink(target: self, selector: #selector(loop))
+                let displayLink = CADisplayLink(target: self, selector: #selector(loop))
+                displayLink.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: 10,
+                    maximum: 120,
+                    preferred: preferredFps
+                )
+                link = displayLink
             }
             link?.add(to: .main, forMode: .common)
         }
